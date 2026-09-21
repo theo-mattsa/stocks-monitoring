@@ -2,9 +2,12 @@ package com.soe.domain;
 
 import java.time.Instant;
 import com.soe.dto.QuoteDTO;
+
+import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data
+@AllArgsConstructor
 public class Quote {
 
     // Descriptive fields for the stock quote
@@ -39,6 +42,8 @@ public class Quote {
     // Maximum and minimum prices over the last 52 weeks
     Double fiftyTwoWeekLow;
     Double fiftyTwoWeekHigh;
+
+    public Quote() {}   
 
     public Quote(QuoteDTO quoteDTO) {
         this.symbol = quoteDTO.symbol();
