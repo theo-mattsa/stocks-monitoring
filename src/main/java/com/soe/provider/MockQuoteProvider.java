@@ -19,7 +19,7 @@ public class MockQuoteProvider implements QuoteProvider {
 
     @Override
     public List<Quote> fetchQuotes(String symbol) {
-       try (InputStream is = getClass().getResourceAsStream("/mocks/magalu.json")) {
+       try (InputStream is = getClass().getResourceAsStream("/mocks/" + symbol.toLowerCase() + ".json")) {
            if (is == null) {
                throw new RuntimeException("Mock data file not found for symbol: " + symbol);
            }
