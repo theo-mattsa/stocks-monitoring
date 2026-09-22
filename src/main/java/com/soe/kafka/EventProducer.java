@@ -1,23 +1,32 @@
 package com.soe.kafka;
 
-import java.util.Properties;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.soe.domain.Quote;
+import com.soe.provider.MockQuoteProvider;
+import com.soe.provider.QuoteProvider;
 import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.StringSerializer;
+
+import java.util.List;
 
 public class EventProducer {
-    private final KafkaProducer<String, String> producer;
-    public EventProducer() {
-        Properties props = new Properties();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:19092,localhost:29092,localhost:39092");
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        this.producer = new KafkaProducer<>(props);
-    }
-    public void send(String topic, String key, String value) {
-        ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, value);
-        producer.send(record);
+
+    private static final String TOPIC = "quotes-topic";
+    public static void main(String[] args) throws Exception {
+        QuoteProvider provider = new MockQuoteProvider();
+        List<Quote> quotes = provider.fetchQuotes("MGLU3");
+        ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
+        try (KafkaProducer<String, String> producer = new KafkaProducer<>(KafkaConfig.getProducerProps())) {
+            for (Quote quote : quotes) {
+                String json = mapper.writeValueAsString(quote);
+                producer.send(new ProducerRecord<>(TOPIC, quote.getSymbol(), json));
+                producer.flush();
+                System.out.println("Sent: " + quote.getSymbol() + " - " + quote.getRegularMarketPrice());
+                Thread.sleep(1500);
+            }
+        } catch (Exception e) {
+            System.err.println("Error while producing messages: " + e.getMessage());
+        }
     }
 }
