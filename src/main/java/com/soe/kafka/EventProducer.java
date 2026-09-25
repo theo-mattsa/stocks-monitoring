@@ -12,7 +12,8 @@ import java.util.List;
 
 public class EventProducer {
 
-    private static final String TOPIC = "quotes-topic";
+    private static final String TOPIC = "quote-snapshots";
+    
     public static void main(String[] args) throws Exception {
         QuoteProvider provider = new MockQuoteProvider();
         List<Quote> quotes = provider.fetchQuotes("MGLU3");
@@ -20,10 +21,10 @@ public class EventProducer {
         try (KafkaProducer<String, String> producer = new KafkaProducer<>(KafkaConfig.getProducerProps())) {
             for (Quote quote : quotes) {
                 String json = mapper.writeValueAsString(quote);
-                producer.send(new ProducerRecord<>(TOPIC, quote.getSymbol(), json));
+                producer.send(new ProducerRecord<>(TOPIC, json));
                 producer.flush();
                 System.out.println("Sent: " + quote.getSymbol() + " - " + quote.getRegularMarketPrice());
-                Thread.sleep(1500);
+                Thread.sleep(60000);
             }
         } catch (Exception e) {
             System.err.println("Error while producing messages: " + e.getMessage());

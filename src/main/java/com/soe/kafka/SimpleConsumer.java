@@ -11,11 +11,10 @@ import java.util.List;
 public class SimpleConsumer {
 
     // Quotes topic (snapshots of stock prices)
-    private static final String QUOTES_TOPIC = "quotes-topic";
+    private static final String QUOTES_TOPIC = "quote-snapshots";
 
     // Derived events topic
     private static final String EVENTS_TOPIC = "market-events";
-
     private static final String GROUP_ID = "simple-consumer-group";
 
     private static final boolean CONSUME_QUOTES = true;
