@@ -5,4 +5,9 @@ public record ReachedDayLowEvent(String symbol, Double currentPrice) implements 
     public String getType() {
         return "DAY_LOW_REACHED";
     }
+
+    @Override
+    public String getSymbol() {
+        return symbol;
+    }
 }

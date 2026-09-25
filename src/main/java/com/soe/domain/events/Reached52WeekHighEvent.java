@@ -5,4 +5,9 @@ public record Reached52WeekHighEvent(String symbol, Double currentPrice) impleme
     public String getType() {
         return "52_WEEK_HIGH_REACHED";
     }
+
+    @Override
+    public String getSymbol() {
+        return symbol;
+    }
 } 
