@@ -16,9 +16,10 @@ public class ApiQuoteProvider implements QuoteProvider {
     }
 
     @Override
-    public List<Quote> fetchQuotes(String symbol) {
+    public Quote fetchQuote(String symbol) {
         BrapiResponseDTO response = brapiClient.getQuote(symbol);
-        return response.results().stream().map(Quote::new).collect(Collectors.toList());
+        List<Quote> quotes = response.results().stream().map(Quote::new).collect(Collectors.toList());
+        return quotes.isEmpty() ? null : quotes.get(0);
     }
     
 }
