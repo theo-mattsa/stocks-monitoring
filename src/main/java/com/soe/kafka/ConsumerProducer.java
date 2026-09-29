@@ -12,13 +12,15 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
-public class MarketEventProcessor {
+public class ConsumerProducer {
 
-    private static final String INPUT_TOPIC = "stock-quotes";
-    private static final String OUTPUT_TOPIC = "market-events";
-    private static final String GROUP_ID = "market-event-processor-group";
 
     private static final double SIGNIFICANT_DAILY_CHANGE_THRESHOLD = 0.03;
     private static final double PRICE_SPIKE_THRESHOLD = 0.02; 
@@ -29,12 +31,12 @@ public class MarketEventProcessor {
     private final KafkaProducer<String, String> producer;
     private final ObjectMapper mapper;
 
-    private final Map<String, List<Quote>> windows = new HashMap<>();
+    private final Map<String, Deque<Quote>> windows = new HashMap<>();
 
-    public MarketEventProcessor() {
-        Properties consProps = KafkaConfig.getConsumerProps(GROUP_ID);
+    public ConsumerProducer() {
+        Properties consProps = KafkaConfig.getConsumerProps(KafkaConfig.MARKET_EVENT_PROCESSOR_GROUP_ID);
         this.consumer = new KafkaConsumer<>(consProps);
-        this.consumer.subscribe(Collections.singletonList(INPUT_TOPIC));
+        this.consumer.subscribe(Collections.singletonList(KafkaConfig.QUOTES_TOPIC));
         Properties prodProps = KafkaConfig.getProducerProps();
         this.producer = new KafkaProducer<>(prodProps);
         this.mapper = new ObjectMapper().registerModule(new JavaTimeModule());
@@ -42,7 +44,7 @@ public class MarketEventProcessor {
 
     public void startProcessing() {
         new Thread(() -> {
-            System.out.println("Starting processing of " + INPUT_TOPIC + "...");
+            System.out.println("Starting processing of " + KafkaConfig.MARKET_EVENTS_TOPIC + "...");
             while (true) {
                 try {
                     ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
@@ -66,18 +68,14 @@ public class MarketEventProcessor {
             checkHighLowExtremes(quote);
 
             // Stateful Event Processing with Sliding Window
-            windows.putIfAbsent(symbol, new ArrayList<>());
-            List<Quote> window = windows.get(symbol);
+            windows.putIfAbsent(symbol, new ArrayDeque<>());
+            Deque<Quote> window = windows.get(symbol);
+            window.addLast(quote);
 
-            window.add(quote);
-            window.sort(Comparator.comparing(Quote::getRegularMarketTime));
-
-            if (window.size() > WINDOW_SIZE) {
-                window.remove(0); 
-            }
+            if (window.size() > WINDOW_SIZE) 
+                window.removeFirst();
 
             checkWindowPriceSpike(quote, window);
-
         } catch (Exception e) {
             System.err.println("Error processing quote: " + e.getMessage());
         }
@@ -101,22 +99,17 @@ public class MarketEventProcessor {
     private void checkHighLowExtremes(Quote quote) {
         Double price = quote.getRegularMarketPrice();
         if (price == null) return;
-
-        if (quote.getRegularMarketDayHigh() != null && price >= quote.getRegularMarketDayHigh()) {
+        if (quote.getRegularMarketDayHigh() != null && price >= quote.getRegularMarketDayHigh()) 
             sendEvent(new ReachedDayHighEvent(quote.getSymbol(), price));
-        }
-        if (quote.getRegularMarketDayLow() != null && price <= quote.getRegularMarketDayLow()) {
+        if (quote.getRegularMarketDayLow() != null && price <= quote.getRegularMarketDayLow()) 
             sendEvent(new ReachedDayLowEvent(quote.getSymbol(), price));
-        }
-        if (quote.getFiftyTwoWeekHigh() != null && price >= quote.getFiftyTwoWeekHigh()) {
+        if (quote.getFiftyTwoWeekHigh() != null && price >= quote.getFiftyTwoWeekHigh()) 
             sendEvent(new Reached52WeekHighEvent(quote.getSymbol(), price));
-        }
-        if (quote.getFiftyTwoWeekLow() != null && price <= quote.getFiftyTwoWeekLow()) {
+        if (quote.getFiftyTwoWeekLow() != null && price <= quote.getFiftyTwoWeekLow()) 
             sendEvent(new Reached52WeekLowEvent(quote.getSymbol(), price));
-        }
     }
 
-    private void checkWindowPriceSpike(Quote current, List<Quote> window) {
+    private void checkWindowPriceSpike(Quote current, Deque<Quote> window) {
         if (window.size() < PRICE_SPIKE_MIN_SNAPSHOTS) {
             return;
         }
@@ -144,13 +137,20 @@ public class MarketEventProcessor {
     private void sendEvent(MarketEvent event) {
         try {
             String eventJson = mapper.writeValueAsString(event);
-            ProducerRecord<String, String> record = new ProducerRecord<>(OUTPUT_TOPIC, event.getSymbol(), eventJson);
+            ProducerRecord<String, String> record = new ProducerRecord<>(KafkaConfig.MARKET_EVENTS_TOPIC, event.getSymbol(), eventJson);
             if (event.getType() != null) 
                 record.headers().add("eventType", event.getType().getBytes());
-            producer.send(record);
-            System.out.printf("[EVENTO GERADO] Ticker: %s | Tipo: %s%n", event.getSymbol(), event.getType());
+            producer.send(record, (metadata, exception) -> {
+                if (exception != null) {
+                    System.err.println("Error sending event: " + exception.getMessage());
+                } else {
+                    System.out.printf("Sent event for %s to topic %s, partition %d, offset %d%n",
+                            event.getSymbol(), metadata.topic(), metadata.partition(), metadata.offset());
+                }
+            });
+
         } catch (JsonProcessingException e) {
-            System.err.println("Erro ao serializar evento: " + e.getMessage());
+            System.err.println("Error serializing event: " + e.getMessage());
         }
     }
 }
