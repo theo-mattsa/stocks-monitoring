@@ -9,6 +9,11 @@ import java.util.Properties;
 
 public class KafkaConfig {
 
+    public static final String QUOTES_TOPIC = "stock-quotes";
+    public static final String MARKET_EVENTS_TOPIC = "market-events";
+    public static final String DASHBOARD_CONSUMERS_GROUP_ID = "dashboard-group";
+    public static final String MARKET_EVENT_PROCESSOR_GROUP_ID = "market-event-processor-group";
+
     private static final String BOOTSTRAP_SERVERS = "localhost:19092,localhost:29092,localhost:39092";
 
     public static Properties getProducerProps() {
@@ -25,7 +30,8 @@ public class KafkaConfig {
         props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
         return props;
     }
 }

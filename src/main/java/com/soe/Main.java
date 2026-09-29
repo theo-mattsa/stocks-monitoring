@@ -1,33 +1,29 @@
 package com.soe;
 
-import com.soe.kafka.MarketEventProcessor;
-import com.soe.kafka.QuoteProducer;
-import com.soe.kafka.TerminalConsumer;
+import com.soe.kafka.KafkaConfig;
+import com.soe.kafka.Producer;
+import com.soe.kafka.Consumer;
 import com.soe.provider.MockQuoteProvider;
 
 import java.util.Arrays;
 import java.util.List;
 
-
 public class Main {
+
     public static void main(String[] args) throws InterruptedException {
+
         System.out.println("Starting the application...");
 
-        List<String> activeSymbols = Arrays.asList("PETR4", "VALE3", "ITUB4", "BBDC4");
-        List<String> topicsToSubscribe = Arrays.asList("stock-quotes", "market-trends");
+        List<String> activeSymbols = Arrays.asList("PETR4", "VALE3");
+        List<String> topicsToSubscribe = Arrays.asList(KafkaConfig.QUOTES_TOPIC);
 
-  
-        QuoteProducer producer = new QuoteProducer(new MockQuoteProvider());
+        Producer producer = new Producer(new MockQuoteProvider());
         producer.startPublishing(activeSymbols);
-     
-        MarketEventProcessor processor = new MarketEventProcessor();
-        processor.startProcessing();
 
         String sharedGroupId = "dashboard-group";
-        TerminalConsumer consumerA = new TerminalConsumer("Consumidor-A", sharedGroupId, topicsToSubscribe);
-        consumerA.startConsuming();
-        TerminalConsumer consumerB = new TerminalConsumer("Consumidor-B", sharedGroupId, topicsToSubscribe);
-        consumerB.startConsuming();
+
+        Consumer consumer1 = new Consumer("Consumer1", sharedGroupId, topicsToSubscribe);
+        consumer1.startConsuming();
 
         Thread.currentThread().join();
     }
