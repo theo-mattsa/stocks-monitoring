@@ -28,7 +28,6 @@ public class Consumer {
 
     public void startConsuming() {
         new Thread(() -> {
-            System.out.println("Consumer " + consumerId + " started consuming from topics: " + consumer.subscription());
             try {
                 while (true) {
                     ConsumerRecords<String, Object> records = consumer.poll(Duration.ofMillis(1000));
@@ -37,7 +36,7 @@ public class Consumer {
                         if (value instanceof Quote quote) {
                             if (DashboardUI.isGuiInitialized()) {
                                 DashboardUI.getInstance().updateQuote(quote.getSymbol(), quote.getRegularMarketPrice(),
-                                        quote.getRegularMarketChange());
+                                        quote.getRegularMarketChangePercent());
                             } else {
                                 System.out.printf("Consumer [%s] topic=%s | partition=%d | offset=%d | key=%s%n",
                                         consumerId, record.topic(), record.partition(), record.offset(), record.key());
