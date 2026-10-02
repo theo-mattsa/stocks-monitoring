@@ -24,6 +24,18 @@ public class DashboardUI {
     private MultiWindowTextGUI gui;
     private Table<String> quoteTable;
     private TextBox eventLog;
+    private static DashboardUI instance;
+
+    public static DashboardUI getInstance() {
+        if (instance == null) {
+            instance = new DashboardUI();
+        }
+        return instance;
+    }
+
+    public static boolean isGuiInitialized() {
+        return instance != null && instance.gui != null;
+    }
 
     public void start() {
         new Thread(() -> {
@@ -65,7 +77,7 @@ public class DashboardUI {
         }, "ui-thread").start();
     }
 
-    public void updateQuote(String symbol, String price, String change) {
+    public void updateQuote(String symbol, Double price, Double change) {
         if (gui == null) return;
         gui.getGUIThread().invokeLater(() -> {
             int rowCount = quoteTable.getTableModel().getRowCount();
@@ -75,7 +87,7 @@ public class DashboardUI {
                     break;
                 }
             }
-            quoteTable.getTableModel().addRow(symbol, price, change);
+            quoteTable.getTableModel().addRow(symbol, String.valueOf(price), String.valueOf(change));
         });
     }
 

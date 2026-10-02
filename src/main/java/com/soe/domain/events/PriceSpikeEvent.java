@@ -18,5 +18,11 @@ public record PriceSpikeEvent(
     @Override
     public String getSymbol() {
         return symbol;
+    } 
+
+    @Override
+    public String constructMessage() {
+        return String.format("Price spike detected for %s: current price is %.2f", symbol, currentPrice, windowAveragePrice, deviationPercent);
     }
+
 }

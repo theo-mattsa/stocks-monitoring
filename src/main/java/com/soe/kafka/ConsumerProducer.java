@@ -1,15 +1,16 @@
 package com.soe.kafka;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.soe.domain.Quote;
 import com.soe.domain.events.*;
+import com.soe.kafka.serialization.JsonDeserializer;
+import com.soe.kafka.serialization.JsonSerializer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -22,15 +23,13 @@ import java.util.Properties;
 
 public class ConsumerProducer {
 
-
     private static final double SIGNIFICANT_DAILY_CHANGE_THRESHOLD = 0.03;
     private static final double PRICE_SPIKE_THRESHOLD = 0.02; 
     private static final int PRICE_SPIKE_MIN_SNAPSHOTS = 15;
     private static final int WINDOW_SIZE = 30;
 
-    private final KafkaConsumer<String, String> consumer;
-    private final KafkaProducer<String, String> producer;
-    private final ObjectMapper mapper;
+    private final KafkaConsumer<String, Quote> consumer;
+    private final KafkaProducer<String, MarketEvent> producer;
     private final Map<String, Deque<Quote>> windows = new HashMap<>();
 
     // Cooldown map to prevent sending too many events for the same symbol
@@ -43,11 +42,10 @@ public class ConsumerProducer {
 
     public ConsumerProducer() {
         Properties consProps = KafkaConfig.getConsumerProps(KafkaConfig.MARKET_EVENT_PROCESSOR_GROUP_ID);
-        this.consumer = new KafkaConsumer<>(consProps);
+        this.consumer = new KafkaConsumer<String, Quote>(consProps, new StringDeserializer(), new JsonDeserializer<>(Quote.class));
         this.consumer.subscribe(Collections.singletonList(KafkaConfig.QUOTES_TOPIC));
         Properties prodProps = KafkaConfig.getProducerProps();
-        this.producer = new KafkaProducer<>(prodProps);
-        this.mapper = new ObjectMapper().registerModule(new JavaTimeModule());
+        this.producer = new KafkaProducer<String, MarketEvent>(prodProps, new StringSerializer(), new JsonSerializer<MarketEvent>());
     }
 
     public void startProcessing() {
@@ -55,8 +53,8 @@ public class ConsumerProducer {
             System.out.println("Starting processing of " + KafkaConfig.MARKET_EVENTS_TOPIC + "...");
             while (true) {
                 try {
-                    ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
-                    for (ConsumerRecord<String, String> record : records) {
+                    ConsumerRecords<String, Quote> records = consumer.poll(Duration.ofMillis(1000));
+                    for (ConsumerRecord<String, Quote> record : records) {
                         processQuote(record.value());
                     }
                 } catch (Exception e) {
@@ -66,9 +64,8 @@ public class ConsumerProducer {
         }, "processor-thread").start();
     }
 
-    private void processQuote(String quoteJson) {
+    private void processQuote(Quote quote) {
         try {
-            Quote quote = mapper.readValue(quoteJson, Quote.class);
             String symbol = quote.getSymbol();
 
             // Stateless Event Processing
@@ -79,10 +76,10 @@ public class ConsumerProducer {
             windows.putIfAbsent(symbol, new ArrayDeque<>());
             Deque<Quote> window = windows.get(symbol);
             window.addLast(quote);
-
             if (window.size() > WINDOW_SIZE) 
                 window.removeFirst();
 
+            // Stateful Event Processing
             checkWindowPriceSpike(quote, window);
         } catch (Exception e) {
             System.err.println("Error processing quote: " + e.getMessage());
@@ -170,8 +167,7 @@ public class ConsumerProducer {
 
     private void sendEvent(MarketEvent event) {
         try {
-            String eventJson = mapper.writeValueAsString(event);
-            ProducerRecord<String, String> record = new ProducerRecord<>(KafkaConfig.MARKET_EVENTS_TOPIC, event.getSymbol(), eventJson);
+            ProducerRecord<String, MarketEvent> record = new ProducerRecord<>(KafkaConfig.MARKET_EVENTS_TOPIC, event.getSymbol(), event);
             if (event.getType() != null) 
                 record.headers().add("eventType", event.getType().getBytes());
             producer.send(record, (metadata, exception) -> {
@@ -183,8 +179,8 @@ public class ConsumerProducer {
                 }
             });
 
-        } catch (JsonProcessingException e) {
-            System.err.println("Error serializing event: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Error sending event: " + e.getMessage());
         }
     }
 }

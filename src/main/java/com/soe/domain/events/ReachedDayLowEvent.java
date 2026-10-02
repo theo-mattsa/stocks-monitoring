@@ -10,4 +10,9 @@ public record ReachedDayLowEvent(String symbol, Double currentPrice) implements 
     public String getSymbol() {
         return symbol;
     }
+
+    @Override
+    public String constructMessage() {
+        return String.format("Day low reached for %s: current price is %.2f", symbol, currentPrice);
+    }
 }
