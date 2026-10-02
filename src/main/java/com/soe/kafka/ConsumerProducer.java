@@ -12,6 +12,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.Deque;
@@ -30,8 +31,15 @@ public class ConsumerProducer {
     private final KafkaConsumer<String, String> consumer;
     private final KafkaProducer<String, String> producer;
     private final ObjectMapper mapper;
-
     private final Map<String, Deque<Quote>> windows = new HashMap<>();
+
+    // Cooldown map to prevent sending too many events for the same symbol
+    private final Map<String, Instant> lastEventTimes = new HashMap<>();
+    private static final long EVENT_COOLDOWN_SECONDS = 300;
+
+    // Maps to track if a symbol is currently at its day high or low
+    private final Map<String, Boolean> isAtDayHigh = new HashMap<>();
+    private final Map<String, Boolean> isAtDayLow = new HashMap<>();
 
     public ConsumerProducer() {
         Properties consProps = KafkaConfig.getConsumerProps(KafkaConfig.MARKET_EVENT_PROCESSOR_GROUP_ID);
@@ -99,14 +107,30 @@ public class ConsumerProducer {
     private void checkHighLowExtremes(Quote quote) {
         Double price = quote.getRegularMarketPrice();
         if (price == null) return;
-        if (quote.getRegularMarketDayHigh() != null && price >= quote.getRegularMarketDayHigh()) 
-            sendEvent(new ReachedDayHighEvent(quote.getSymbol(), price));
-        if (quote.getRegularMarketDayLow() != null && price <= quote.getRegularMarketDayLow()) 
-            sendEvent(new ReachedDayLowEvent(quote.getSymbol(), price));
-        if (quote.getFiftyTwoWeekHigh() != null && price >= quote.getFiftyTwoWeekHigh()) 
-            sendEvent(new Reached52WeekHighEvent(quote.getSymbol(), price));
-        if (quote.getFiftyTwoWeekLow() != null && price <= quote.getFiftyTwoWeekLow()) 
-            sendEvent(new Reached52WeekLowEvent(quote.getSymbol(), price));
+        Double dayHigh = quote.getRegularMarketDayHigh();
+        if (dayHigh != null) {
+            boolean currentlyAtHigh = isAtDayHigh.getOrDefault(quote.getSymbol(), false);
+            if (price >= dayHigh) {
+                if (!currentlyAtHigh) {
+                    sendEvent(new ReachedDayHighEvent(quote.getSymbol(), price));
+                    isAtDayHigh.put(quote.getSymbol(), true); 
+                }
+            } else {
+                isAtDayHigh.put(quote.getSymbol(), false);
+            }
+        }
+        Double dayLow = quote.getRegularMarketDayLow();
+        if (dayLow != null) {
+            boolean currentlyAtLow = isAtDayLow.getOrDefault(quote.getSymbol(), false);
+            if (price <= dayLow) {
+                if (!currentlyAtLow) {
+                    sendEvent(new ReachedDayLowEvent(quote.getSymbol(), price));
+                    isAtDayLow.put(quote.getSymbol(), true);
+                }
+            } else {
+                isAtDayLow.put(quote.getSymbol(), false);
+            }
+        }
     }
 
     private void checkWindowPriceSpike(Quote current, Deque<Quote> window) {
@@ -130,7 +154,17 @@ public class ConsumerProducer {
                     (currentPrice - avg) / avg * 100,
                     current.getRegularMarketTime()
             );
-            sendEvent(event);
+            sendEventWithCooldown(event);
+        }
+    }
+
+    private void sendEventWithCooldown(MarketEvent event) {
+        String eventKey = event.getSymbol() + "-" + event.getType();
+        Instant now = Instant.now();
+        Instant lastTime = lastEventTimes.get(eventKey);
+        if (lastTime == null || Duration.between(lastTime, now).getSeconds() >= EVENT_COOLDOWN_SECONDS) {
+            lastEventTimes.put(eventKey, now);
+            sendEvent(event); 
         }
     }
 
