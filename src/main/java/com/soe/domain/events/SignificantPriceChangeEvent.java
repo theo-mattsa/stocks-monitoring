@@ -10,7 +10,7 @@ public record SignificantPriceChangeEvent(
         double changePercent,
         Instant timestamp) implements MarketEvent {
     @Override
-    @JsonProperty("type") 
+    @JsonProperty("type")
     public String getType() {
         return "SIGNIFICANT_PRICE_CHANGE";
     }
@@ -22,7 +22,7 @@ public record SignificantPriceChangeEvent(
 
     @Override
     public String constructMessage() {
-        return String.format("VARIAÇÃO RELEVANTE em %s: preço anterior R$ %.2f, atual R$ %.2f (variação: %.2f%%)", 
+        return String.format("VARIAÇÃO RELEVANTE em %s: preço anterior R$ %.2f, atual R$ %.2f (variação: %.2f%%)",
                 symbol, previousPrice, currentPrice, changePercent * 100);
     }
 }

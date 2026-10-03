@@ -24,7 +24,7 @@ import java.util.Properties;
 public class ConsumerProducer {
 
     private static final double SIGNIFICANT_DAILY_CHANGE_THRESHOLD = 0.03;
-    private static final double PRICE_SPIKE_THRESHOLD = 0.02; 
+    private static final double PRICE_SPIKE_THRESHOLD = 0.02;
     private static final int PRICE_SPIKE_MIN_SNAPSHOTS = 5;
     private static final int WINDOW_SIZE = 30;
 
@@ -42,10 +42,12 @@ public class ConsumerProducer {
 
     public ConsumerProducer() {
         Properties consProps = KafkaConfig.getConsumerProps(KafkaConfig.MARKET_EVENT_PROCESSOR_GROUP_ID);
-        this.consumer = new KafkaConsumer<String, Quote>(consProps, new StringDeserializer(), new JsonDeserializer<>(Quote.class));
+        this.consumer = new KafkaConsumer<String, Quote>(consProps, new StringDeserializer(),
+                new JsonDeserializer<>(Quote.class));
         this.consumer.subscribe(Collections.singletonList(KafkaConfig.QUOTES_TOPIC));
         Properties prodProps = KafkaConfig.getProducerProps();
-        this.producer = new KafkaProducer<String, MarketEvent>(prodProps, new StringSerializer(), new JsonSerializer<MarketEvent>());
+        this.producer = new KafkaProducer<String, MarketEvent>(prodProps, new StringSerializer(),
+                new JsonSerializer<MarketEvent>());
     }
 
     public void startProcessing() {
@@ -76,7 +78,7 @@ public class ConsumerProducer {
             windows.putIfAbsent(symbol, new ArrayDeque<>());
             Deque<Quote> window = windows.get(symbol);
             window.addLast(quote);
-            if (window.size() > WINDOW_SIZE) 
+            if (window.size() > WINDOW_SIZE)
                 window.removeFirst();
 
             // Stateful Event Processing
@@ -88,29 +90,29 @@ public class ConsumerProducer {
 
     private void checkSignificantDailyChange(Quote quote) {
         Double changePercent = quote.getRegularMarketChangePercent();
-        if (changePercent != null && Math.abs(changePercent) >= (SIGNIFICANT_DAILY_CHANGE_THRESHOLD * 100)) {
+        if (changePercent != null && Math.abs(changePercent) >= SIGNIFICANT_DAILY_CHANGE_THRESHOLD) {
             Double prevClose = quote.getRegularMarketPreviousClose();
             SignificantPriceChangeEvent event = new SignificantPriceChangeEvent(
                     quote.getSymbol(),
                     prevClose,
                     quote.getRegularMarketPrice(),
-                    changePercent / 100.0,
-                    quote.getRegularMarketTime()
-            );
+                    changePercent, 
+                    quote.getRegularMarketTime());
             sendEvent(event);
         }
     }
 
     private void checkHighLowExtremes(Quote quote) {
         Double price = quote.getRegularMarketPrice();
-        if (price == null) return;
+        if (price == null)
+            return;
         Double dayHigh = quote.getRegularMarketDayHigh();
         if (dayHigh != null) {
             boolean currentlyAtHigh = isAtDayHigh.getOrDefault(quote.getSymbol(), false);
             if (price >= dayHigh) {
                 if (!currentlyAtHigh) {
                     sendEvent(new ReachedDayHighEvent(quote.getSymbol(), price));
-                    isAtDayHigh.put(quote.getSymbol(), true); 
+                    isAtDayHigh.put(quote.getSymbol(), true);
                 }
             } else {
                 isAtDayHigh.put(quote.getSymbol(), false);
@@ -149,8 +151,7 @@ public class ConsumerProducer {
                     currentPrice,
                     avg,
                     (currentPrice - avg) / avg * 100,
-                    current.getRegularMarketTime()
-            );
+                    current.getRegularMarketTime());
             sendEventWithCooldown(event);
         }
     }
@@ -161,21 +162,22 @@ public class ConsumerProducer {
         Instant lastTime = lastEventTimes.get(eventKey);
         if (lastTime == null || Duration.between(lastTime, now).getSeconds() >= EVENT_COOLDOWN_SECONDS) {
             lastEventTimes.put(eventKey, now);
-            sendEvent(event); 
+            sendEvent(event);
         }
     }
 
     private void sendEvent(MarketEvent event) {
         try {
-            ProducerRecord<String, MarketEvent> record = new ProducerRecord<>(KafkaConfig.MARKET_EVENTS_TOPIC, event.getSymbol(), event);
-            if (event.getType() != null) 
+            ProducerRecord<String, MarketEvent> record = new ProducerRecord<>(KafkaConfig.MARKET_EVENTS_TOPIC,
+                    event.getSymbol(), event);
+            if (event.getType() != null)
                 record.headers().add("eventType", event.getType().getBytes());
             producer.send(record, (metadata, exception) -> {
                 if (exception != null) {
                     System.err.println("Error sending event: " + exception.getMessage());
                 } else {
                     System.out.printf("Sent event for %s to topic %s, partition %d, offset %d%n",
-                        event.getSymbol(), metadata.topic(), metadata.partition(), metadata.offset());
+                            event.getSymbol(), metadata.topic(), metadata.partition(), metadata.offset());
                 }
             });
 

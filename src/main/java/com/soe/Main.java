@@ -16,7 +16,7 @@ public class Main {
 
         DashboardUI.getInstance().start();
 
-        List<String> activeSymbols = Arrays.asList("PETR4", "VALE3");
+        List<String> activeSymbols = Arrays.asList("PETR4", "VALE3", "ITUB4", "BBDC4");
         List<String> topicsToSubscribe = Arrays.asList(KafkaConfig.QUOTES_TOPIC, KafkaConfig.MARKET_EVENTS_TOPIC);
 
         Producer producer = new Producer(new MockQuoteProvider());

@@ -25,12 +25,15 @@ public class DashboardUI {
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private DashboardUI() {
-        priceFormat.setMinimumFractionDigits(4); priceFormat.setMaximumFractionDigits(4);
-        percentFormat.setMinimumFractionDigits(0); percentFormat.setMaximumFractionDigits(4);
+        priceFormat.setMinimumFractionDigits(4);
+        priceFormat.setMaximumFractionDigits(4);
+        percentFormat.setMinimumFractionDigits(0);
+        percentFormat.setMaximumFractionDigits(4);
     }
 
     public static DashboardUI getInstance() {
-        if (instance == null) instance = new DashboardUI();
+        if (instance == null)
+            instance = new DashboardUI();
         return instance;
     }
 
@@ -41,7 +44,7 @@ public class DashboardUI {
     public void start() {
         SwingUtilities.invokeLater(() -> {
             FlatDarkLaf.setup();
-            
+
             // Global UI font scaling
             UIManager.put("defaultFont", new Font("SansSerif", Font.PLAIN, 15));
 
@@ -55,7 +58,7 @@ public class DashboardUI {
 
             // Header bar
             JPanel topPanel = new JPanel(new BorderLayout());
-            JLabel title = new JLabel("PAINEL DE MERCADO");
+            JLabel title = new JLabel("PAINEL DE MONITORAMENTO");
             title.setFont(new Font("SansSerif", Font.BOLD, 22));
             title.setForeground(new Color(0, 229, 255));
 
@@ -77,15 +80,24 @@ public class DashboardUI {
             tabbedPane = new JTabbedPane();
 
             // Tab 1: Live Quotes
-            String[] cols = {"ATIVO", "PREÇO", "VARIAÇÃO"};
+            String[] cols = { "ATIVO", "PREÇO", "VARIAÇÃO" };
             tableModel = new DefaultTableModel(cols, 0) {
                 @Override
-                public boolean isCellEditable(int r, int c) { return false; }
+                public boolean isCellEditable(int r, int c) {
+                    return false;
+                }
             };
             JTable quoteTable = new JTable(tableModel);
             quoteTable.setRowHeight(38);
             quoteTable.setFont(new Font("SansSerif", Font.PLAIN, 16));
             quoteTable.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 16));
+            DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+            centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+            for (int i = 0; i < quoteTable.getColumnCount(); i++) {
+                quoteTable.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
+            }
+            ((DefaultTableCellRenderer) quoteTable.getTableHeader().getDefaultRenderer())
+                    .setHorizontalAlignment(SwingConstants.CENTER);
 
             // Gain/loss cell rendering
             quoteTable.getColumnModel().getColumn(2).setCellRenderer(new DefaultTableCellRenderer() {
@@ -94,8 +106,8 @@ public class DashboardUI {
                     Component comp = super.getTableCellRendererComponent(t, v, s, f, r, c);
                     if (v != null) {
                         String val = v.toString();
-                        comp.setForeground(val.startsWith("+") ? new Color(46, 204, 113) : 
-                                         val.startsWith("-") ? new Color(231, 76, 60) : t.getForeground());
+                        comp.setForeground(val.startsWith("+") ? new Color(46, 204, 113)
+                                : val.startsWith("-") ? new Color(231, 76, 60) : t.getForeground());
                     }
                     return comp;
                 }
@@ -128,26 +140,35 @@ public class DashboardUI {
     }
 
     public void updateQuote(String symbol, Double price, Double change) {
-        if (!isGuiInitialized()) return;
+        if (!isGuiInitialized())
+            return;
 
         SwingUtilities.invokeLater(() -> {
+            String formattedPrice = priceFormat.format(price);
+            double changeVal = (change != null) ? change : 0.0;
+            String formattedChange = (changeVal > 0 ? "+" : "") + percentFormat.format(changeVal);
+
+            int existingRow = -1;
             for (int i = 0; i < tableModel.getRowCount(); i++) {
                 if (tableModel.getValueAt(i, 0).equals(symbol)) {
-                    tableModel.removeRow(i);
+                    existingRow = i;
                     break;
                 }
             }
+            if (existingRow != -1) {
+                tableModel.setValueAt(formattedPrice, existingRow, 1);
+                tableModel.setValueAt(formattedChange, existingRow, 2);
+            } else {
+                tableModel.addRow(new Object[] { symbol, formattedPrice, formattedChange });
+            }
 
-            String formattedPrice = priceFormat.format(price);
-            String formattedChange = (change > 0 ? "+" : "") + percentFormat.format(change);
-
-            tableModel.addRow(new Object[]{symbol, formattedPrice, formattedChange});
             symbolCount.setText("ATIVOS: " + tableModel.getRowCount());
         });
     }
 
     public void logEvent(String eventMessage) {
-        if (!isGuiInitialized()) return;
+        if (!isGuiInitialized())
+            return;
 
         SwingUtilities.invokeLater(() -> {
             totalEvents++;
@@ -165,8 +186,8 @@ public class DashboardUI {
     }
 
     public void setMarketStatus(boolean connected) {
-        if (!isGuiInitialized()) return;
-
+        if (!isGuiInitialized())
+            return;
         SwingUtilities.invokeLater(() -> {
             marketStatus.setText(connected ? "● MERCADO: AO VIVO" : "● MERCADO: OFFLINE");
             marketStatus.setForeground(connected ? new Color(46, 204, 113) : new Color(231, 76, 60));
