@@ -24,6 +24,7 @@ import java.util.Properties;
 public class ConsumerProducer {
 
     private static final double SIGNIFICANT_DAILY_CHANGE_THRESHOLD = 0.03;
+    private static final double VOLATILITY_THRESHOLD = 0.015;
     private static final double PRICE_SPIKE_THRESHOLD = 0.02;
     private static final int PRICE_SPIKE_MIN_SNAPSHOTS = 5;
     private static final int WINDOW_SIZE = 30;
@@ -83,8 +84,29 @@ public class ConsumerProducer {
 
             // Stateful Event Processing
             checkWindowPriceSpike(quote, window);
+            checkWindowVolatility(symbol, window);
         } catch (Exception e) {
             System.err.println("Error processing quote: " + e.getMessage());
+        }
+    }
+
+    private void checkWindowVolatility(String symbol, Deque<Quote> window) {
+        if (window.size() < 5)
+            return;
+        double minPrice = Double.MAX_VALUE;
+        double maxPrice = Double.MIN_VALUE;
+        for (Quote q : window) {
+            if (q.getRegularMarketPrice() != null) {
+                minPrice = Math.min(minPrice, q.getRegularMarketPrice());
+                maxPrice = Math.max(maxPrice, q.getRegularMarketPrice());
+            }
+        }
+        if (minPrice > 0) {
+            double spreadPercent = (maxPrice - minPrice) / minPrice;
+            if (spreadPercent >= VOLATILITY_THRESHOLD) {
+                VolatilityEvent event = new VolatilityEvent(symbol, spreadPercent);
+                sendEvent(event);
+            }
         }
     }
 
@@ -96,7 +118,7 @@ public class ConsumerProducer {
                     quote.getSymbol(),
                     prevClose,
                     quote.getRegularMarketPrice(),
-                    changePercent, 
+                    changePercent,
                     quote.getRegularMarketTime());
             sendEvent(event);
         }
