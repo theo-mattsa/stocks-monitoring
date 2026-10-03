@@ -3,6 +3,7 @@ package com.soe;
 import com.soe.kafka.KafkaConfig;
 import com.soe.kafka.Producer;
 import com.soe.kafka.Consumer;
+import com.soe.kafka.ConsumerProducer;
 import com.soe.provider.MockQuoteProvider;
 import com.soe.ui.DashboardUI;
 
@@ -16,7 +17,7 @@ public class Main {
         DashboardUI.getInstance().start();
 
         List<String> activeSymbols = Arrays.asList("PETR4", "VALE3");
-        List<String> topicsToSubscribe = Arrays.asList(KafkaConfig.QUOTES_TOPIC);
+        List<String> topicsToSubscribe = Arrays.asList(KafkaConfig.QUOTES_TOPIC, KafkaConfig.MARKET_EVENTS_TOPIC);
 
         Producer producer = new Producer(new MockQuoteProvider());
         producer.startPublishing(activeSymbols);
@@ -25,6 +26,9 @@ public class Main {
 
         Consumer consumer1 = new Consumer("Consumer1", sharedGroupId, topicsToSubscribe);
         Consumer consumer2 = new Consumer("Consumer2", sharedGroupId, topicsToSubscribe);
+        ConsumerProducer consumerProducer = new ConsumerProducer();
+        
+        consumerProducer.startProcessing();
         consumer1.startConsuming();
         consumer2.startConsuming();
 

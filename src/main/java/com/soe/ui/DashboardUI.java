@@ -1,51 +1,32 @@
 package com.soe.ui;
 
-import java.io.IOException;
+import com.formdev.flatlaf.FlatDarkLaf;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
 import java.text.NumberFormat;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
 import java.util.Locale;
 
-import com.googlecode.lanterna.TextColor;
-import com.googlecode.lanterna.TerminalSize;
-import com.googlecode.lanterna.gui2.BasicWindow;
-import com.googlecode.lanterna.gui2.DefaultWindowManager;
-import com.googlecode.lanterna.gui2.Direction;
-import com.googlecode.lanterna.gui2.EmptySpace;
-import com.googlecode.lanterna.gui2.Label;
-import com.googlecode.lanterna.gui2.LinearLayout;
-import com.googlecode.lanterna.gui2.MultiWindowTextGUI;
-import com.googlecode.lanterna.gui2.Panel;
-import com.googlecode.lanterna.gui2.TextBox;
-import com.googlecode.lanterna.gui2.Window;
-import com.googlecode.lanterna.gui2.table.Table;
-import com.googlecode.lanterna.screen.Screen;
-import com.googlecode.lanterna.screen.TerminalScreen;
-import com.googlecode.lanterna.terminal.DefaultTerminalFactory;
-import com.googlecode.lanterna.terminal.Terminal;
-
 public class DashboardUI {
-    private MultiWindowTextGUI gui;
-    private Table<String> quoteTable;
-    private TextBox eventLog;
-    private Label marketStatus;
-    private Label symbolCount;
-    private Label eventCount;
-    private int totalEvents = 0;
     private static DashboardUI instance;
-    private final NumberFormat priceFormat;
-    private final NumberFormat percentFormat;
+    private JFrame frame;
+    private DefaultTableModel tableModel;
+    private JTextArea eventLog;
+    private JLabel marketStatus, symbolCount, eventCount;
+    private JTabbedPane tabbedPane;
+    private int totalEvents = 0, unreadEvents = 0;
+
+    private final NumberFormat priceFormat = NumberFormat.getNumberInstance(Locale.US);
+    private final NumberFormat percentFormat = NumberFormat.getPercentInstance(Locale.US);
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private DashboardUI() {
-        priceFormat = NumberFormat.getNumberInstance(Locale.US);
-        priceFormat.setMinimumFractionDigits(4);
-        priceFormat.setMaximumFractionDigits(4);
-
-        percentFormat = NumberFormat.getPercentInstance(Locale.US);
-        percentFormat.setMinimumFractionDigits(0);
-        percentFormat.setMaximumFractionDigits(4);
+        priceFormat.setMinimumFractionDigits(4); priceFormat.setMaximumFractionDigits(4);
+        percentFormat.setMinimumFractionDigits(0); percentFormat.setMaximumFractionDigits(4);
     }
 
     public static DashboardUI getInstance() {
@@ -54,138 +35,141 @@ public class DashboardUI {
     }
 
     public static boolean isGuiInitialized() {
-        return instance != null && instance.gui != null;
+        return instance != null && instance.frame != null && instance.frame.isVisible();
     }
 
     public void start() {
-        new Thread(() -> {
-            try {
-                Terminal terminal = new DefaultTerminalFactory().createTerminal();
-                Screen screen = new TerminalScreen(terminal);
-                screen.startScreen();
+        SwingUtilities.invokeLater(() -> {
+            FlatDarkLaf.setup();
+            
+            // Global UI font scaling
+            UIManager.put("defaultFont", new Font("SansSerif", Font.PLAIN, 15));
 
-                Panel mainPanel = new Panel();
-                mainPanel.setLayoutManager(new LinearLayout(Direction.VERTICAL));
-                mainPanel.setPreferredSize(new TerminalSize(80, 30));
+            frame = new JFrame("Sistema de Monitoramento de Ações");
+            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            frame.setSize(1000, 650);
+            frame.setLocationRelativeTo(null);
 
-                Label title = new Label(" STOCKS MONITORING SYSTEM ");
-                title.setForegroundColor(TextColor.ANSI.CYAN);
-                mainPanel.addComponent(title);
+            JPanel mainPanel = new JPanel(new BorderLayout(0, 15));
+            mainPanel.setBorder(BorderFactory.createEmptyBorder(18, 18, 18, 18));
 
-                Label subtitle = new Label(" Real-Time Market Dashboard");
-                subtitle.setForegroundColor(TextColor.ANSI.WHITE);
-                mainPanel.addComponent(subtitle);
+            // Header bar
+            JPanel topPanel = new JPanel(new BorderLayout());
+            JLabel title = new JLabel("PAINEL DE MERCADO");
+            title.setFont(new Font("SansSerif", Font.BOLD, 22));
+            title.setForeground(new Color(0, 229, 255));
 
-                mainPanel.addComponent(new EmptySpace(new TerminalSize(0, 1)));
+            JPanel statusGroup = new JPanel(new FlowLayout(FlowLayout.RIGHT, 18, 0));
+            marketStatus = new JLabel("● MERCADO: AO VIVO");
+            marketStatus.setForeground(new Color(46, 204, 113));
+            marketStatus.setFont(new Font("SansSerif", Font.BOLD, 15));
 
-                Panel statusPanel = new Panel();
-                statusPanel.setLayoutManager(new LinearLayout(Direction.HORIZONTAL));
+            symbolCount = new JLabel("ATIVOS: 0");
+            eventCount = new JLabel("EVENTOS: 0");
 
-                marketStatus = new Label(" ● MARKET: LIVE ");
-                marketStatus.setForegroundColor(TextColor.ANSI.GREEN);
+            statusGroup.add(marketStatus);
+            statusGroup.add(symbolCount);
+            statusGroup.add(eventCount);
+            topPanel.add(title, BorderLayout.WEST);
+            topPanel.add(statusGroup, BorderLayout.EAST);
 
-                symbolCount = new Label(" │ SYMBOLS: 0 ");
-                symbolCount.setForegroundColor(TextColor.ANSI.YELLOW);
+            // Tabbed container
+            tabbedPane = new JTabbedPane();
 
-                eventCount = new Label(" │ EVENTS: 0 ");
-                eventCount.setForegroundColor(TextColor.ANSI.YELLOW);
+            // Tab 1: Live Quotes
+            String[] cols = {"ATIVO", "PREÇO", "VARIAÇÃO"};
+            tableModel = new DefaultTableModel(cols, 0) {
+                @Override
+                public boolean isCellEditable(int r, int c) { return false; }
+            };
+            JTable quoteTable = new JTable(tableModel);
+            quoteTable.setRowHeight(38);
+            quoteTable.setFont(new Font("SansSerif", Font.PLAIN, 16));
+            quoteTable.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 16));
 
-                statusPanel.addComponent(marketStatus);
-                statusPanel.addComponent(symbolCount);
-                statusPanel.addComponent(eventCount);
-                mainPanel.addComponent(statusPanel);
+            // Gain/loss cell rendering
+            quoteTable.getColumnModel().getColumn(2).setCellRenderer(new DefaultTableCellRenderer() {
+                @Override
+                public Component getTableCellRendererComponent(JTable t, Object v, boolean s, boolean f, int r, int c) {
+                    Component comp = super.getTableCellRendererComponent(t, v, s, f, r, c);
+                    if (v != null) {
+                        String val = v.toString();
+                        comp.setForeground(val.startsWith("+") ? new Color(46, 204, 113) : 
+                                         val.startsWith("-") ? new Color(231, 76, 60) : t.getForeground());
+                    }
+                    return comp;
+                }
+            });
 
-                mainPanel.addComponent(new EmptySpace(new TerminalSize(0, 1)));
+            tabbedPane.addTab("  Cotações em Tempo Real  ", new JScrollPane(quoteTable));
 
-                Label quoteTitle = new Label("┌────────────── LIVE QUOTES ──────────────┐");
-                quoteTitle.setForegroundColor(TextColor.ANSI.CYAN);
-                mainPanel.addComponent(quoteTitle);
+            // Tab 2: Market Events Log
+            eventLog = new JTextArea();
+            eventLog.setEditable(false);
+            eventLog.setFont(new Font("Monospaced", Font.PLAIN, 17)); // Increased event font size
+            eventLog.setMargin(new Insets(10, 10, 10, 10));
 
-                quoteTable = new Table<>("ATIVO", "PREÇO", "VARIAÇÃO");
-                quoteTable.setPreferredSize(new TerminalSize(70, 8));
-                mainPanel.addComponent(quoteTable);
+            tabbedPane.addTab("  Eventos de Mercado  ", new JScrollPane(eventLog));
 
-                Label quoteBottom = new Label("└─────────────────────────────────────────┘");
-                quoteBottom.setForegroundColor(TextColor.ANSI.CYAN);
-                mainPanel.addComponent(quoteBottom);
+            // Reset event badge on tab focus
+            tabbedPane.addChangeListener(e -> {
+                if (tabbedPane.getSelectedIndex() == 1) {
+                    unreadEvents = 0;
+                    tabbedPane.setTitleAt(1, "  Eventos de Mercado  ");
+                }
+            });
 
-                mainPanel.addComponent(new EmptySpace(new TerminalSize(0, 1)));
+            mainPanel.add(topPanel, BorderLayout.NORTH);
+            mainPanel.add(tabbedPane, BorderLayout.CENTER);
 
-                Label eventTitle = new Label("┌────────────── MARKET EVENTS ────────────┐");
-                eventTitle.setForegroundColor(TextColor.ANSI.CYAN);
-                mainPanel.addComponent(eventTitle);
-
-                eventLog = new TextBox("", TextBox.Style.MULTI_LINE);
-                eventLog.setPreferredSize(new TerminalSize(70, 8));
-                eventLog.setReadOnly(true);
-                mainPanel.addComponent(eventLog);
-
-                Label eventBottom = new Label("└─────────────────────────────────────────┘");
-                eventBottom.setForegroundColor(TextColor.ANSI.CYAN);
-                mainPanel.addComponent(eventBottom);
-
-                BasicWindow window = new BasicWindow(" Stocks Monitoring System ");
-                window.setComponent(mainPanel);
-                window.setHints(Arrays.asList(Window.Hint.CENTERED));
-
-                gui = new MultiWindowTextGUI(screen, new DefaultWindowManager(), new EmptySpace(TextColor.ANSI.BLACK));
-                gui.addWindowAndWait(window);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }, "ui-thread").start();
+            frame.add(mainPanel);
+            frame.setVisible(true);
+        });
     }
 
     public void updateQuote(String symbol, Double price, Double change) {
-        if (gui == null) return;
+        if (!isGuiInitialized()) return;
 
-        gui.getGUIThread().invokeLater(() -> {
-            int rowCount = quoteTable.getTableModel().getRowCount();
-
-            for (int i = 0; i < rowCount; i++) {
-                if (quoteTable.getTableModel().getRow(i).get(0).equals(symbol)) {
-                    quoteTable.getTableModel().removeRow(i);
+        SwingUtilities.invokeLater(() -> {
+            for (int i = 0; i < tableModel.getRowCount(); i++) {
+                if (tableModel.getValueAt(i, 0).equals(symbol)) {
+                    tableModel.removeRow(i);
                     break;
                 }
             }
 
             String formattedPrice = priceFormat.format(price);
-            String formattedChange = percentFormat.format(change);
+            String formattedChange = (change > 0 ? "+" : "") + percentFormat.format(change);
 
-            if (change > 0) formattedChange = "+" + formattedChange;
-
-            quoteTable.getTableModel().addRow(symbol, formattedPrice, formattedChange);
-
-            symbolCount.setText(" │ SYMBOLS: " + quoteTable.getTableModel().getRowCount() + " ");
+            tableModel.addRow(new Object[]{symbol, formattedPrice, formattedChange});
+            symbolCount.setText("ATIVOS: " + tableModel.getRowCount());
         });
     }
 
     public void logEvent(String eventMessage) {
-        if (gui == null) return;
+        if (!isGuiInitialized()) return;
 
-        gui.getGUIThread().invokeLater(() -> {
+        SwingUtilities.invokeLater(() -> {
             totalEvents++;
-
             String timestamp = LocalTime.now().format(timeFormatter);
-            String newEvent = "[" + timestamp + "] " + eventMessage;
-            String newText = newEvent + "\n" + eventLog.getText();
+            eventLog.insert("[" + timestamp + "] " + eventMessage + "\n", 0);
+            eventLog.setCaretPosition(0);
 
-            eventLog.setText(newText);
-            eventCount.setText(" │ EVENTS: " + totalEvents + " ");
+            eventCount.setText("EVENTOS: " + totalEvents);
+
+            if (tabbedPane.getSelectedIndex() != 1) {
+                unreadEvents++;
+                tabbedPane.setTitleAt(1, "  Eventos de Mercado  🔴 " + unreadEvents);
+            }
         });
     }
 
     public void setMarketStatus(boolean connected) {
-        if (gui == null) return;
+        if (!isGuiInitialized()) return;
 
-        gui.getGUIThread().invokeLater(() -> {
-            if (connected) {
-                marketStatus.setText(" ● MARKET: LIVE ");
-                marketStatus.setForegroundColor(TextColor.ANSI.GREEN);
-            } else {
-                marketStatus.setText(" ● MARKET: OFFLINE ");
-                marketStatus.setForegroundColor(TextColor.ANSI.RED);
-            }
+        SwingUtilities.invokeLater(() -> {
+            marketStatus.setText(connected ? "● MERCADO: AO VIVO" : "● MERCADO: OFFLINE");
+            marketStatus.setForeground(connected ? new Color(46, 204, 113) : new Color(231, 76, 60));
         });
     }
 }
