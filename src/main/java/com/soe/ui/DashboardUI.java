@@ -1,6 +1,8 @@
 package com.soe.ui;
 
 import com.formdev.flatlaf.FlatDarkLaf;
+import com.soe.domain.Quote;
+import com.soe.domain.events.MarketEvent;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -139,18 +141,18 @@ public class DashboardUI {
         });
     }
 
-    public void updateQuote(String symbol, Double price, Double change) {
+    public void updateQuote(Quote quote) {
         if (!isGuiInitialized())
             return;
 
         SwingUtilities.invokeLater(() -> {
-            String formattedPrice = priceFormat.format(price);
-            double changeVal = (change != null) ? change : 0.0;
+            String formattedPrice = priceFormat.format(quote.getRegularMarketPrice());
+            double changeVal = (quote.getRegularMarketChangePercent() != null) ? quote.getRegularMarketChangePercent() : 0.0;
             String formattedChange = (changeVal > 0 ? "+" : "") + percentFormat.format(changeVal);
 
             int existingRow = -1;
             for (int i = 0; i < tableModel.getRowCount(); i++) {
-                if (tableModel.getValueAt(i, 0).equals(symbol)) {
+                if (tableModel.getValueAt(i, 0).equals(quote.getSymbol())) {
                     existingRow = i;
                     break;
                 }
@@ -159,24 +161,25 @@ public class DashboardUI {
                 tableModel.setValueAt(formattedPrice, existingRow, 1);
                 tableModel.setValueAt(formattedChange, existingRow, 2);
             } else {
-                tableModel.addRow(new Object[] { symbol, formattedPrice, formattedChange });
+                tableModel.addRow(new Object[] { quote.getSymbol(), formattedPrice, formattedChange });
             }
-
             symbolCount.setText("ATIVOS: " + tableModel.getRowCount());
         });
     }
 
-    public void logEvent(String eventMessage) {
+    public void logEvent(MarketEvent event) {
         if (!isGuiInitialized())
             return;
 
         SwingUtilities.invokeLater(() -> {
             totalEvents++;
             String timestamp = LocalTime.now().format(timeFormatter);
+            String eventMessage = event.constructMessage();
             eventLog.insert("[" + timestamp + "] " + eventMessage + "\n", 0);
             eventLog.setCaretPosition(0);
-            if (eventMessage.contains("PICO DE PREÇO"))
+            if (event instanceof MarketEvent) {
                 Toolkit.getDefaultToolkit().beep();
+            }
             eventCount.setText("EVENTOS: " + totalEvents);
             if (tabbedPane.getSelectedIndex() != 1) {
                 unreadEvents++;

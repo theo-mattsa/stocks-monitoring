@@ -35,8 +35,7 @@ public class Consumer {
                         Object value = record.value();
                         if (value instanceof Quote quote) {
                             if (DashboardUI.isGuiInitialized()) {
-                                DashboardUI.getInstance().updateQuote(quote.getSymbol(), quote.getRegularMarketPrice(),
-                                        quote.getRegularMarketChangePercent());
+                                DashboardUI.getInstance().updateQuote(quote);
                             } else {
                                 System.out.printf("Consumer [%s] topic=%s | partition=%d | offset=%d | key=%s%n",
                                         consumerId, record.topic(), record.partition(), record.offset(), record.key());
@@ -46,7 +45,7 @@ public class Consumer {
 
                         if (value instanceof MarketEvent marketEvent) {
                             if (DashboardUI.isGuiInitialized()) {
-                                DashboardUI.getInstance().logEvent(marketEvent.constructMessage());
+                                DashboardUI.getInstance().logEvent(marketEvent);
                             } else {
                                 System.out.printf("Consumer [%s] topic=%s | partition=%d | offset=%d | key=%s | event=%s%n",
                                         consumerId, record.topic(), record.partition(), record.offset(), record.key(), marketEvent);
