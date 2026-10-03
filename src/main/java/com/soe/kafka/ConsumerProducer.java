@@ -25,7 +25,7 @@ public class ConsumerProducer {
 
     private static final double SIGNIFICANT_DAILY_CHANGE_THRESHOLD = 0.03;
     private static final double PRICE_SPIKE_THRESHOLD = 0.02; 
-    private static final int PRICE_SPIKE_MIN_SNAPSHOTS = 15;
+    private static final int PRICE_SPIKE_MIN_SNAPSHOTS = 5;
     private static final int WINDOW_SIZE = 30;
 
     private final KafkaConsumer<String, Quote> consumer;
@@ -34,7 +34,7 @@ public class ConsumerProducer {
 
     // Cooldown map to prevent sending too many events for the same symbol
     private final Map<String, Instant> lastEventTimes = new HashMap<>();
-    private static final long EVENT_COOLDOWN_SECONDS = 300;
+    private static final long EVENT_COOLDOWN_SECONDS = 5;
 
     // Maps to track if a symbol is currently at its day high or low
     private final Map<String, Boolean> isAtDayHigh = new HashMap<>();
@@ -175,7 +175,7 @@ public class ConsumerProducer {
                     System.err.println("Error sending event: " + exception.getMessage());
                 } else {
                     System.out.printf("Sent event for %s to topic %s, partition %d, offset %d%n",
-                            event.getSymbol(), metadata.topic(), metadata.partition(), metadata.offset());
+                        event.getSymbol(), metadata.topic(), metadata.partition(), metadata.offset());
                 }
             });
 
