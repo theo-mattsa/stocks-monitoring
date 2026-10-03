@@ -13,6 +13,6 @@ public record ReachedDayHighEvent(String symbol, Double currentPrice) implements
 
     @Override
     public String constructMessage() {
-        return String.format("Day high reached for %s: current price is %.2f", symbol, currentPrice);
+        return String.format("MÁXIMA DO DIA em %s: atingiu R$ %.2f", symbol, currentPrice);
     }
 }

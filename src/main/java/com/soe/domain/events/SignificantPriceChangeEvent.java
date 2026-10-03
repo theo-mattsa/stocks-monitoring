@@ -22,6 +22,7 @@ public record SignificantPriceChangeEvent(
 
     @Override
     public String constructMessage() {
-        return String.format("Significant price change detected for %s: previous price was %.2f, current price is %.2f, change percent is %.2f%%", symbol, previousPrice, currentPrice, changePercent);
+        return String.format("VARIAÇÃO RELEVANTE em %s: preço anterior R$ %.2f, atual R$ %.2f (variação: %.2f%%)", 
+                symbol, previousPrice, currentPrice, changePercent * 100);
     }
 }

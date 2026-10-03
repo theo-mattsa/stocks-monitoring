@@ -1,7 +1,7 @@
 package com.soe.domain.events;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-
 
 @JsonTypeInfo(
     use = JsonTypeInfo.Id.NAME, 
@@ -15,6 +15,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
     @JsonSubTypes.Type(value = ReachedDayLowEvent.class, name = "DAY_LOW_REACHED"),
     @JsonSubTypes.Type(value = SignificantPriceChangeEvent.class, name = "SIGNIFICANT_PRICE_CHANGE")
 })
+@JsonIgnoreProperties (ignoreUnknown = true)
 public interface MarketEvent {
     String getType();
     String getSymbol();

@@ -15,6 +15,7 @@ public record PriceSpikeEvent(
     public String getType() {
         return "WINDOW_PRICE_SPIKE";
     }
+
     @Override
     public String getSymbol() {
         return symbol;
@@ -22,7 +23,7 @@ public record PriceSpikeEvent(
 
     @Override
     public String constructMessage() {
-        return String.format("Price spike detected for %s: current price is %.2f", symbol, currentPrice, windowAveragePrice, deviationPercent);
+        return String.format("PICO DE PREÇO em %s: O preço atual é R$ %.2f. Média da janela: R$ %.2f. Desvio: %.2f%%", 
+                symbol, currentPrice, windowAveragePrice, deviationPercent);
     }
-
 }
