@@ -26,8 +26,9 @@ public class Producer {
                 while (true) {
                     for (String symbol : symbols) {
                         Quote quote = quoteProvider.fetchQuote(symbol);
-                        if (quote == null) continue;
-                        ProducerRecord<String, Quote> record = new ProducerRecord<>(KafkaConfig.QUOTES_TOPIC, symbol, quote);
+                        if (quote == null)
+                            continue;
+                        ProducerRecord<String, Quote> record = new ProducerRecord<>(KafkaConfig.QUOTES_TOPIC, symbol,quote);
                         producer.send(record);
                         Thread.sleep(1000);
                     }

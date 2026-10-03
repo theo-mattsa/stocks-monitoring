@@ -2,7 +2,7 @@ package com.soe.kafka;
 
 import com.soe.domain.Quote;
 import com.soe.domain.events.MarketEvent;
-import com.soe.kafka.serialization.MultiTypeDeserializer;
+import com.soe.kafka.serialization.JsonDeserializer;
 import com.soe.ui.DashboardUI;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -19,10 +19,10 @@ public class Consumer {
     private final KafkaConsumer<String, Object> consumer;
     private final String consumerId;
 
-    public Consumer(String consumerId, String groupId, List<String> topicsToSubscribe) {
+   public Consumer(String consumerId, String groupId, List<String> topicsToSubscribe) {
         this.consumerId = consumerId;
         Properties props = KafkaConfig.getConsumerProps(groupId);
-        this.consumer = new KafkaConsumer<String, Object>(props, new StringDeserializer(), new MultiTypeDeserializer());
+        this.consumer = new KafkaConsumer<>(props, new StringDeserializer(), new JsonDeserializer<>());
         this.consumer.subscribe(topicsToSubscribe);
     }
 

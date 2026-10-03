@@ -5,10 +5,11 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.apache.kafka.common.serialization.Serializer;
 
 public class JsonSerializer<T> implements Serializer<T> {
+
     private final ObjectMapper objectMapper;
 
     public JsonSerializer() {
-        this.objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+        this.objectMapper = new ObjectMapper().registerModule(new JavaTimeModule()); 
     }
 
     @Override
@@ -17,7 +18,7 @@ public class JsonSerializer<T> implements Serializer<T> {
         try {
             return objectMapper.writeValueAsBytes(data);
         } catch (Exception e) {
-            throw new RuntimeException("Erro ao serializar objeto para JSON", e);
+            throw new RuntimeException("Error serializing object to JSON: " + topic, e);
         }
     }
 }

@@ -3,6 +3,7 @@ package com.soe.ui;
 import com.formdev.flatlaf.FlatDarkLaf;
 import com.soe.domain.Quote;
 import com.soe.domain.events.MarketEvent;
+import com.soe.domain.events.PriceSpikeEvent;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -177,7 +178,7 @@ public class DashboardUI {
             String eventMessage = event.constructMessage();
             eventLog.insert("[" + timestamp + "] " + eventMessage + "\n", 0);
             eventLog.setCaretPosition(0);
-            if (event instanceof MarketEvent) {
+            if (event instanceof PriceSpikeEvent) {
                 Toolkit.getDefaultToolkit().beep();
             }
             eventCount.setText("EVENTOS: " + totalEvents);
