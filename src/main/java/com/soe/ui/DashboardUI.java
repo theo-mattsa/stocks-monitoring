@@ -175,9 +175,9 @@ public class DashboardUI {
             String timestamp = LocalTime.now().format(timeFormatter);
             eventLog.insert("[" + timestamp + "] " + eventMessage + "\n", 0);
             eventLog.setCaretPosition(0);
-
+            if (eventMessage.contains("PICO DE PREÇO"))
+                Toolkit.getDefaultToolkit().beep();
             eventCount.setText("EVENTOS: " + totalEvents);
-
             if (tabbedPane.getSelectedIndex() != 1) {
                 unreadEvents++;
                 tabbedPane.setTitleAt(1, "  Eventos de Mercado  🔴 " + unreadEvents);
