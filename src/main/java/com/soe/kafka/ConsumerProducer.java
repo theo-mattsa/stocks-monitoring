@@ -41,6 +41,8 @@ public class ConsumerProducer {
                     for (ConsumerRecord<String, Quote> record : records) {
                         processQuote(record.value());
                     }
+                    if (!records.isEmpty()) 
+                        consumer.commitSync();
                 } catch (Exception e) {
                     System.err.println("Error during loop processing: " + e.getMessage());
                 }
