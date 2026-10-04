@@ -33,25 +33,11 @@ public class Consumer {
                     ConsumerRecords<String, Object> records = consumer.poll(Duration.ofMillis(1000));
                     for (ConsumerRecord<String, Object> record : records) {
                         Object value = record.value();
-                        if (value instanceof Quote quote) {
-                            if (DashboardUI.isGuiInitialized()) {
-                                DashboardUI.getInstance().updateQuote(quote);
-                            } else {
-                                System.out.printf("Consumer [%s] topic=%s | partition=%d | offset=%d | key=%s%n",
-                                        consumerId, record.topic(), record.partition(), record.offset(), record.key());
-
-                            }
-                        }
-
-                        if (value instanceof MarketEvent marketEvent) {
-                            if (DashboardUI.isGuiInitialized()) {
-                                DashboardUI.getInstance().logEvent(marketEvent);
-                            } else {
-                                System.out.printf("Consumer [%s] topic=%s | partition=%d | offset=%d | key=%s | event=%s%n",
-                                        consumerId, record.topic(), record.partition(), record.offset(), record.key(), marketEvent);
-                            }
-                        }
-
+                        if (value instanceof Quote quote && DashboardUI.isGuiInitialized()) 
+                            DashboardUI.getInstance().updateQuote(quote);
+                        if (value instanceof MarketEvent marketEvent && DashboardUI.isGuiInitialized()) 
+                            DashboardUI.getInstance().logEvent(marketEvent);
+                        System.out.printf("Consumer [%s] topic=%s | partition=%d | offset=%d | key=%s%n", consumerId, record.topic(), record.partition(), record.offset(), record.key());
                     }
                     // Commit only after processing all records to ensure at-least-once semantics
                     if (!records.isEmpty())

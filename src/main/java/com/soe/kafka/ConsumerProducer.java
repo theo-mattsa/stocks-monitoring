@@ -22,8 +22,10 @@ public class ConsumerProducer {
     private final KafkaConsumer<String, Quote> consumer;
     private final KafkaProducer<String, MarketEvent> producer;
     private final MarketEventService analyzer;
+    private final String consumerProducerId;
 
-    public ConsumerProducer() {
+    public ConsumerProducer(String consumerProducerId) {
+        this.consumerProducerId = consumerProducerId;
         this.analyzer = new MarketEventService();
         Properties consProps = KafkaConfig.getConsumerProps(KafkaConfig.MARKET_EVENT_PROCESSOR_GROUP_ID);
         this.consumer = new KafkaConsumer<>(consProps, new StringDeserializer(), new JsonDeserializer<>(Quote.class));
@@ -47,7 +49,7 @@ public class ConsumerProducer {
                     System.err.println("Error during loop processing: " + e.getMessage());
                 }
             }
-        }, "processor-thread").start();
+        }, "processor-thread" + "-" + consumerProducerId).start();
     }
 
     private void processQuote(Quote quote) {

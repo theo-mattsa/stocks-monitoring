@@ -16,21 +16,22 @@ public class Main {
 
         DashboardUI.getInstance().start();
 
-        List<String> activeSymbols = Arrays.asList("PETR4", "VALE3", "ITUB4", "BBDC4");
+        List<String> activeSymbolsProducer1 = Arrays.asList("PETR4", "VALE3");
+        List<String> activeSymbolsProducer2 = Arrays.asList("ITUB4", "BBDC4");
         List<String> topicsToSubscribe = Arrays.asList(KafkaConfig.QUOTES_TOPIC, KafkaConfig.MARKET_EVENTS_TOPIC);
 
-        Producer producer = new Producer(new MockQuoteProvider());
-        producer.startPublishing(activeSymbols);
+        Producer producer1 = new Producer(new MockQuoteProvider(), "p1");
+        Producer producer2 = new Producer(new MockQuoteProvider(), "p2");
+        producer1.startPublishing(activeSymbolsProducer1);
+        producer2.startPublishing(activeSymbolsProducer2);
 
-        String sharedGroupId = "dashboard-group";
+        Consumer consumer = new Consumer("c1", KafkaConfig.DASHBOARD_CONSUMERS_GROUP_ID, topicsToSubscribe);
+        ConsumerProducer processor1 = new ConsumerProducer("cprod1");
+        ConsumerProducer processor2 = new ConsumerProducer("cprod2");
 
-        Consumer consumer1 = new Consumer("Consumer1", sharedGroupId, topicsToSubscribe);
-        Consumer consumer2 = new Consumer("Consumer2", sharedGroupId, topicsToSubscribe);
-        ConsumerProducer consumerProducer = new ConsumerProducer();
-        
-        consumerProducer.startProcessing();
-        consumer1.startConsuming();
-        consumer2.startConsuming();
+        consumer.startConsuming();
+        processor1.startProcessing();
+        processor2.startProcessing();
 
         Thread.currentThread().join();
     }
