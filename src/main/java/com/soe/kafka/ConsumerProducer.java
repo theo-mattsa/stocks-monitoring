@@ -1,9 +1,10 @@
 package com.soe.kafka;
 
 import com.soe.domain.Quote;
-import com.soe.domain.events.*;
+import com.soe.domain.events.MarketEvent;
 import com.soe.kafka.serialization.JsonDeserializer;
 import com.soe.kafka.serialization.JsonSerializer;
+import com.soe.service.MarketEventAnalyzer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -11,43 +12,24 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-
 import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayDeque;
 import java.util.Collections;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 import java.util.Properties;
 
 public class ConsumerProducer {
 
-    private static final double SIGNIFICANT_DAILY_CHANGE_THRESHOLD = 0.03;
-    private static final double PRICE_SPIKE_THRESHOLD = 0.02;
-    private static final int PRICE_SPIKE_MIN_SNAPSHOTS = 5;
-    private static final int WINDOW_SIZE = 30;
-
     private final KafkaConsumer<String, Quote> consumer;
     private final KafkaProducer<String, MarketEvent> producer;
-    private final Map<String, Deque<Quote>> windows = new HashMap<>();
-
-    // Cooldown map to prevent sending too many events for the same symbol
-    private final Map<String, Instant> lastEventTimes = new HashMap<>();
-    private static final long EVENT_COOLDOWN_SECONDS = 5;
-
-    // Maps to track if a symbol is currently at its day high or low
-    private final Map<String, Boolean> isAtDayHigh = new HashMap<>();
-    private final Map<String, Boolean> isAtDayLow = new HashMap<>();
+    private final MarketEventAnalyzer analyzer;
 
     public ConsumerProducer() {
+        this.analyzer = new MarketEventAnalyzer();
         Properties consProps = KafkaConfig.getConsumerProps(KafkaConfig.MARKET_EVENT_PROCESSOR_GROUP_ID);
-        this.consumer = new KafkaConsumer<String, Quote>(consProps, new StringDeserializer(),
-                new JsonDeserializer<>(Quote.class));
+        this.consumer = new KafkaConsumer<>(consProps, new StringDeserializer(), new JsonDeserializer<>(Quote.class));
         this.consumer.subscribe(Collections.singletonList(KafkaConfig.QUOTES_TOPIC));
         Properties prodProps = KafkaConfig.getProducerProps();
-        this.producer = new KafkaProducer<String, MarketEvent>(prodProps, new StringSerializer(),
-                new JsonSerializer<MarketEvent>());
+        this.producer = new KafkaProducer<>(prodProps, new StringSerializer(), new JsonSerializer<>());
     }
 
     public void startProcessing() {
@@ -67,101 +49,8 @@ public class ConsumerProducer {
     }
 
     private void processQuote(Quote quote) {
-        try {
-            String symbol = quote.getSymbol();
-
-            // Stateless Event Processing
-            checkSignificantDailyChange(quote);
-            checkHighLowExtremes(quote);
-
-            // Stateful Event Processing with Sliding Window
-            windows.putIfAbsent(symbol, new ArrayDeque<>());
-            Deque<Quote> window = windows.get(symbol);
-            window.addLast(quote);
-            if (window.size() > WINDOW_SIZE)
-                window.removeFirst();
-
-            // Stateful Event Processing
-            checkWindowPriceSpike(quote, window);
-        } catch (Exception e) {
-            System.err.println("Error processing quote: " + e.getMessage());
-        }
-    }
-
-    private void checkSignificantDailyChange(Quote quote) {
-        Double changePercent = quote.getRegularMarketChangePercent();
-        if (changePercent != null && Math.abs(changePercent) >= SIGNIFICANT_DAILY_CHANGE_THRESHOLD) {
-            Double prevClose = quote.getRegularMarketPreviousClose();
-            SignificantPriceChangeEvent event = new SignificantPriceChangeEvent(
-                    quote.getSymbol(),
-                    prevClose,
-                    quote.getRegularMarketPrice(),
-                    changePercent,
-                    quote.getRegularMarketTime());
-            sendEvent(event);
-        }
-    }
-
-    private void checkHighLowExtremes(Quote quote) {
-        Double price = quote.getRegularMarketPrice();
-        if (price == null)
-            return;
-        Double dayHigh = quote.getRegularMarketDayHigh();
-        if (dayHigh != null) {
-            boolean currentlyAtHigh = isAtDayHigh.getOrDefault(quote.getSymbol(), false);
-            if (price >= dayHigh) {
-                if (!currentlyAtHigh) {
-                    sendEvent(new ReachedDayHighEvent(quote.getSymbol(), price));
-                    isAtDayHigh.put(quote.getSymbol(), true);
-                }
-            } else {
-                isAtDayHigh.put(quote.getSymbol(), false);
-            }
-        }
-        Double dayLow = quote.getRegularMarketDayLow();
-        if (dayLow != null) {
-            boolean currentlyAtLow = isAtDayLow.getOrDefault(quote.getSymbol(), false);
-            if (price <= dayLow) {
-                if (!currentlyAtLow) {
-                    sendEvent(new ReachedDayLowEvent(quote.getSymbol(), price));
-                    isAtDayLow.put(quote.getSymbol(), true);
-                }
-            } else {
-                isAtDayLow.put(quote.getSymbol(), false);
-            }
-        }
-    }
-
-    private void checkWindowPriceSpike(Quote current, Deque<Quote> window) {
-        if (window.size() < PRICE_SPIKE_MIN_SNAPSHOTS) {
-            return;
-        }
-        double sum = 0;
-        for (Quote q : window) {
-            if (q.getRegularMarketPrice() != null) {
-                sum += q.getRegularMarketPrice();
-            }
-        }
-        double avg = sum / window.size();
-        Double currentPrice = current.getRegularMarketPrice();
-
-        if (currentPrice != null && avg > 0 && Math.abs((currentPrice - avg) / avg) >= PRICE_SPIKE_THRESHOLD) {
-            PriceSpikeEvent event = new PriceSpikeEvent(
-                    current.getSymbol(),
-                    currentPrice,
-                    avg,
-                    (currentPrice - avg) / avg * 100,
-                    current.getRegularMarketTime());
-            sendEventWithCooldown(event);
-        }
-    }
-
-    private void sendEventWithCooldown(MarketEvent event) {
-        String eventKey = event.getSymbol() + "-" + event.getType();
-        Instant now = Instant.now();
-        Instant lastTime = lastEventTimes.get(eventKey);
-        if (lastTime == null || Duration.between(lastTime, now).getSeconds() >= EVENT_COOLDOWN_SECONDS) {
-            lastEventTimes.put(eventKey, now);
+        List<MarketEvent> events = analyzer.analyze(quote);
+        for (MarketEvent event : events) {
             sendEvent(event);
         }
     }
