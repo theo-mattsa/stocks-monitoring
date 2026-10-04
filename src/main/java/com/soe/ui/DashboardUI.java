@@ -30,6 +30,7 @@ public class DashboardUI {
 
     private final NumberFormat priceFormat = NumberFormat.getCurrencyInstance(new Locale("pt", "BR"));
     private final NumberFormat percentFormat = NumberFormat.getPercentInstance(new Locale("pt", "BR"));
+    private final NumberFormat volumeFormat = NumberFormat.getIntegerInstance(new Locale("pt", "BR"));
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private DashboardUI() {
@@ -87,8 +88,8 @@ public class DashboardUI {
             // Tabbed container
             tabbedPane = new JTabbedPane();
 
-            // Tab 1: Live Quotes
-            String[] cols = { "LOGO", "ATIVO", "PREÇO", "VARIAÇÃO" };
+            // Tab 1: Live Quotes - Adicionada a coluna "VOLUME"
+            String[] cols = { "LOGO", "ATIVO", "PREÇO", "VARIAÇÃO", "VOLUME" };
             tableModel = new DefaultTableModel(cols, 0) {
                 @Override
                 public boolean isCellEditable(int r, int c) {
@@ -136,7 +137,7 @@ public class DashboardUI {
                 }
             });
 
-            // Gain/loss cell rendering (coluna 3 agora)
+            // Gain/loss cell rendering
             quoteTable.getColumnModel().getColumn(3).setCellRenderer(new DefaultTableCellRenderer() {
                 @Override
                 public Component getTableCellRendererComponent(JTable t, Object v, boolean s, boolean f, int r, int c) {
@@ -188,6 +189,10 @@ public class DashboardUI {
             double changeVal = (quote.getRegularMarketChangePercent() != null) ? quote.getRegularMarketChangePercent()
                     : 0.0;
             String formattedChange = (changeVal > 0 ? "+" : "") + percentFormat.format(changeVal);
+            
+            Long volume = quote.getRegularMarketVolume();
+            String formattedVolume = (volume != null) ? volumeFormat.format(volume) : "N/A";
+
             ImageIcon icon = iconCache.get(quote.getSymbol());
             int existingRow = -1;
             for (int i = 0; i < tableModel.getRowCount(); i++) {
@@ -202,8 +207,9 @@ public class DashboardUI {
                 }
                 tableModel.setValueAt(formattedPrice, existingRow, 2);
                 tableModel.setValueAt(formattedChange, existingRow, 3);
+                tableModel.setValueAt(formattedVolume, existingRow, 4);
             } else {
-                tableModel.addRow(new Object[] { icon, quote.getSymbol(), formattedPrice, formattedChange });
+                tableModel.addRow(new Object[] { icon, quote.getSymbol(), formattedPrice, formattedChange, formattedVolume });
             }
             symbolCount.setText("ATIVOS: " + tableModel.getRowCount());
         });

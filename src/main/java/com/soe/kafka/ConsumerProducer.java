@@ -4,7 +4,7 @@ import com.soe.domain.Quote;
 import com.soe.domain.events.MarketEvent;
 import com.soe.kafka.serialization.JsonDeserializer;
 import com.soe.kafka.serialization.JsonSerializer;
-import com.soe.service.MarketEventAnalyzer;
+import com.soe.service.MarketEventService;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -21,10 +21,10 @@ public class ConsumerProducer {
 
     private final KafkaConsumer<String, Quote> consumer;
     private final KafkaProducer<String, MarketEvent> producer;
-    private final MarketEventAnalyzer analyzer;
+    private final MarketEventService analyzer;
 
     public ConsumerProducer() {
-        this.analyzer = new MarketEventAnalyzer();
+        this.analyzer = new MarketEventService();
         Properties consProps = KafkaConfig.getConsumerProps(KafkaConfig.MARKET_EVENT_PROCESSOR_GROUP_ID);
         this.consumer = new KafkaConsumer<>(consProps, new StringDeserializer(), new JsonDeserializer<>(Quote.class));
         this.consumer.subscribe(Collections.singletonList(KafkaConfig.QUOTES_TOPIC));

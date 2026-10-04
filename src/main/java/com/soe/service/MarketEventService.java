@@ -6,7 +6,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
-public class MarketEventAnalyzer {
+public class MarketEventService {
 
     private final Map<String, Deque<Quote>> windows = new HashMap<>();
     private final Map<String, Instant> lastEventTimes = new HashMap<>();
